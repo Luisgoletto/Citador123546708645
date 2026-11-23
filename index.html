@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Citador · Fichas bibliográficas, hemerográficas y mesográficas</title>
+<meta name="description" content="Genera fichas de citado con el formato del manual de la institución. Autocompleta con enlace, DOI o ISBN.">
+<meta name="theme-color" content="#0e6b5c">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%230e6b5c'/%3E%3Ctext x='32' y='50' font-size='46' text-anchor='middle' fill='white' font-family='Georgia,serif'%3E%E2%80%9C%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400;1,8..60,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f4efe6;--card:#fffdf9;--ink:#1d2523;--muted:#667069;--line:#e2dacb;--field:#ffffff;
+  --accent:#0e6b5c;--accent-ink:#ffffff;--accent-soft:#dcefe8;--warn:#a4500f;--warn-soft:#fbe9d6;--err:#b3261e;
+  --shadow:0 1px 2px rgba(29,37,35,.05),0 10px 30px rgba(29,37,35,.07);
+  --ui:'Inter',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --serif:'Source Serif 4',Georgia,'Times New Roman',serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121617;--card:#1a2022;--ink:#e8ece9;--muted:#98a39e;--line:#2b3437;--field:#12181a;
+    --accent:#52c7ab;--accent-ink:#05211a;--accent-soft:#16342d;--warn:#f1a964;--warn-soft:#382a1b;--err:#ff8a80;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);color-scheme:dark}
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;font-family:var(--ui);color:var(--ink);line-height:1.5;min-height:100vh;
+  background:radial-gradient(900px 380px at 12% -8%,var(--accent-soft),transparent 70%),var(--bg)}
+.wrap{max-width:1180px;margin:0 auto;padding:22px 16px 56px}
+h1,h2,h3{margin:0}
+.muted{color:var(--muted)}
+.tiny{font-size:.78rem;color:var(--muted);margin:8px 0 0}
+
+/* Encabezado */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:14px}
+.mark{flex:none;width:48px;height:48px;border-radius:14px;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font:600 2.2rem/1 var(--serif);padding-top:10px;box-shadow:var(--shadow)}
+.brand h1{font:600 1.7rem/1.1 var(--serif);letter-spacing:-.01em}
+.brand p{margin:3px 0 0;color:var(--muted);font-size:.9rem}
+
+/* Tarjetas */
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:18px}
+.card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px}
+.card h2{font:600 1.15rem/1.3 var(--serif)}
+.layout{display:grid;gap:18px;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:start;margin-top:18px}
+.result{position:sticky;top:16px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}.result{position:static}}
+
+/* Autocompletar */
+.smart label{font-weight:600;font-size:.85rem;display:block;margin-bottom:8px}
+.row{display:flex;gap:8px}
+.row input{flex:1;min-width:0}
+.status{margin:10px 2px 0;font-size:.84rem;color:var(--muted)}
+.status[data-s="ok"]{color:var(--accent)}
+.status[data-s="err"]{color:var(--err)}
+.status[data-s="load"]::before{content:"";display:inline-block;width:12px;height:12px;margin-right:8px;vertical-align:-2px;
+  border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Selector de tipo */
+.chips-wrap{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px 18px;margin-top:18px}
+@media (max-width:900px){.chips-wrap{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.chips-wrap{grid-template-columns:1fr}}
+.grp-t{display:block;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 .84rem var(--ui);border:1px solid var(--line);background:var(--field);color:var(--ink);border-radius:99px;padding:6px 12px;cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--accent)}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+
+/* Formulario */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 12px;margin-top:14px}
+.f{grid-column:1/-1;min-width:0}
+.f.half{grid-column:auto}
+@media (max-width:560px){.f.half{grid-column:1/-1}}
+.f>label:not(.switch){display:block;font-weight:600;font-size:.82rem;margin-bottom:5px}
+.req{color:var(--warn);margin-left:3px}
+input,select,textarea{width:100%;font:400 .95rem var(--ui);color:var(--ink);background:var(--field);border:1px solid var(--line);
+  border-radius:10px;padding:10px 12px;transition:border-color .15s,box-shadow .15s}
+textarea{resize:vertical;min-height:84px}
+input::placeholder,textarea::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 22%,transparent)}
+small{display:block;margin-top:5px;font-size:.76rem;color:var(--muted)}
+.dp{color:var(--accent)}
+.arows{display:grid;gap:8px}
+.arow{display:grid;grid-template-columns:22px 1fr 1fr 36px;gap:8px;align-items:center}
+.num{font-size:.75rem;font-weight:700;color:var(--muted);text-align:center}
+@media (max-width:560px){.arow{grid-template-columns:1fr 1fr 36px}.num{display:none}}
+.arow-foot{margin-top:8px}
+.switch{display:flex;align-items:center;gap:10px;cursor:pointer;padding:6px 0;position:relative;font-size:.9rem;font-weight:500}
+.switch input{position:absolute;opacity:0;pointer-events:none;width:1px;height:1px}
+.track{flex:none;width:42px;height:24px;border-radius:99px;background:var(--line);position:relative;transition:.2s}
+.track::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.28)}
+.switch input:checked+.track{background:var(--accent)}
+.switch input:checked+.track::after{transform:translateX(18px)}
+.switch input:focus-visible+.track{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 30%,transparent)}
+
+/* Botones */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;font:600 .9rem var(--ui);border-radius:11px;padding:10px 16px;
+  border:1px solid transparent;cursor:pointer;transition:.15s;white-space:nowrap}
+.btn svg{flex:none}
+.btn.primary{background:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.line{background:transparent;border-color:var(--line);color:var(--ink)}
+.btn.line:hover{border-color:var(--accent);color:var(--accent)}
+.btn.ghost{background:transparent;color:var(--muted);padding:6px 10px}
+.btn.ghost:hover{color:var(--ink);background:color-mix(in srgb,var(--line) 50%,transparent)}
+.btn.sm{padding:6px 11px;font-size:.8rem;border-radius:9px}
+.btn:disabled{opacity:.45;cursor:not-allowed;filter:none}
+.btn:focus-visible,.chip:focus-visible,.icon:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.icon{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer}
+.icon:hover:not(:disabled){color:var(--err);border-color:var(--err)}
+.icon:disabled{opacity:.35;cursor:not-allowed}
+
+/* Resultado */
+.ficha{font-family:var(--serif);font-size:1.12rem;line-height:1.65;border:1.5px solid var(--ink);border-radius:8px;
+  padding:14px 16px;background:var(--field);overflow-wrap:anywhere;margin-top:12px;min-height:76px}
+.ficha .ph,.brief .ph{color:var(--muted);font-style:italic;font-family:var(--ui);font-size:.92rem}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.warn{margin-top:10px;background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:.82rem;font-weight:500}
+.sub{margin-top:22px;padding-top:16px;border-top:1px dashed var(--line)}
+.sub h3{font:700 .72rem var(--ui);text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin-bottom:8px}
+.brief-row{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.brief{font-family:var(--serif);font-size:1.05rem;overflow-wrap:anywhere}
+@media (max-width:900px){.result .actions{display:none}}
+
+/* Mi lista */
+.lista{margin-top:18px}
+.lista-h{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+.lista-tools{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.az{display:flex;align-items:center;gap:7px;font-size:.82rem;color:var(--muted);cursor:pointer;margin-right:6px}
+.az input{width:auto}
+.items{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:10px}
+.item{border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--field)}
+.item-t{font-family:var(--serif);font-size:1.02rem;line-height:1.6;overflow-wrap:anywhere}
+.item-a{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.vacia{color:var(--muted);font-size:.9rem;margin:14px 0 0}
+footer{margin-top:26px;color:var(--muted);font-size:.78rem;line-height:1.6}
+footer a{color:inherit}
+
+/* Barra inferior móvil */
+.dock{display:none;position:fixed;left:0;right:0;bottom:0;z-index:20;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb,var(--card) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-top:1px solid var(--line)}
+.dock .btn{flex:1}
+@media (max-width:900px){.dock{display:flex}.wrap{padding-bottom:96px}}
+
+.toast{position:fixed;left:50%;bottom:92px;transform:translate(-50%,16px);background:var(--ink);color:var(--bg);font-size:.86rem;font-weight:500;
+  padding:9px 16px;border-radius:99px;opacity:0;pointer-events:none;transition:.22s;z-index:30;max-width:90vw;text-align:center}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (min-width:901px){.toast{bottom:28px}}
+@media print{.smart,.chips-wrap,.layout,.dock,.lista-tools,.item-a,footer,.top{display:none!important}.lista{box-shadow:none;border:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">“</span>
+      <div>
+        <h1>Citador</h1>
+        <p>Fichas bibliográficas, hemerográficas y mesográficas con el formato de tu institución</p>
+      </div>
+    </div>
+  </header>
+
+  <section class="card smart" aria-label="Autocompletar">
+    <label for="smart">Autocompletar</label>
+    <div class="row">
+      <input id="smart" type="text" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Pega un enlace, un DOI o un ISBN">
+      <button id="btn-auto" class="btn primary" type="button">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7L19 20l-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+        <span>Autocompletar</span>
+      </button>
+    </div>
+    <p id="smart-status" class="status" role="status" aria-live="polite" data-s="">Libros por ISBN · artículos por DOI · páginas, blogs, videos y posts por enlace.</p>
+  </section>
+
+  <nav id="chips" class="card chips-wrap" aria-label="Tipo de fuente"></nav>
+
+  <main class="layout">
+    <section class="card" aria-labelledby="form-t">
+      <div class="card-h">
+        <h2 id="form-t">Datos de la fuente</h2>
+        <button id="btn-limpiar" class="btn ghost sm" type="button">Nueva ficha</button>
+      </div>
+      <p id="form-hint" class="muted" style="margin:0;font-size:.86rem"></p>
+      <form id="form" class="grid" autocomplete="off"></form>
+    </section>
+
+    <aside class="card result" aria-labelledby="res-t">
+      <h2 id="res-t">Tu ficha</h2>
+      <div id="faltan" class="warn" hidden></div>
+      <div id="ficha" class="ficha" tabindex="0"></div>
+      <div class="actions">
+        <button id="btn-copiar" class="btn primary" type="button"></button>
+        <button id="btn-guardar" class="btn line" type="button"></button>
+      </div>
+      <div class="sub">
+        <h3>Cita en el texto</h3>
+        <div class="brief-row">
+          <div id="breve" class="brief"></div>
+          <button id="btn-breve" class="btn line sm" type="button">Copiar</button>
+        </div>
+        <p class="tiny">Formato (Apellido, año), tomado de tu código original: el manual no define la cita breve.</p>
+      </div>
+    </aside>
+  </main>
+
+  <section class="card lista" aria-labelledby="lista-t">
+    <div class="lista-h">
+      <h2 id="lista-t">Mi lista <span id="lista-n" class="muted" style="font-family:var(--ui);font-size:.85rem;font-weight:500"></span></h2>
+      <div class="lista-tools">
+        <label class="az"><input id="az" type="checkbox"> Orden alfabético</label>
+        <button id="btn-todo" class="btn line sm" type="button">Copiar todo</button>
+        <button id="btn-word" class="btn line sm" type="button">Descargar Word</button>
+        <button id="btn-vaciar" class="btn ghost sm" type="button">Vaciar</button>
+      </div>
+    </div>
+    <ul id="items" class="items"></ul>
+    <p id="vacia" class="vacia">Aún no guardas fichas. Arma una arriba y pulsa «Guardar en mi lista» para ir formando tu bibliografía.</p>
+  </section>
+
+  <footer>
+    Tu lista se guarda solo en este navegador (no se sube a ningún servidor ni se sincroniza entre dispositivos).
+    Para autocompletar se consultan servicios públicos: Crossref (DOI), Open Library y Google Books (ISBN) y Microlink (enlaces).
+    Revisa siempre los datos antes de copiar la ficha.
+  </footer>
+</div>
+
+<div class="dock">
+  <button id="dock-copiar" class="btn primary" type="button"></button>
+  <button id="dock-guardar" class="btn line" type="button"></button>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<noscript><p style="padding:20px">Esta página necesita JavaScript para funcionar.</p></noscript>
+
+<!-- ======================= NÚCLEO: reglas del manual (sin DOM) ======================= -->
+<script id="core">
+const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const clean=s=>String(s==null?'':s).replace(/\s+/g,' ').trim();
+const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const T=s=>esc(clean(s));
+const I=s=>clean(s)?'<i>'+esc(clean(s))+'</i>':'';
+const Q=s=>clean(s)?'“'+esc(clean(s))+'”':'';
+const J=(...p)=>p.filter(x=>x&&String(x).trim()).join(', ');
+const decode=s=>String(s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&#(\d+);/g,(_,n)=>String.fromCharCode(+n)).replace(/&amp;/g,'&');
+const plano=h=>decode(String(h).replace(/<[^>]+>/g,''));
+const cleanApi=s=>clean(decode(String(s==null?'':s).replace(/<[^>]+>/g,'')));
+const hoy=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+
+/* ---------- Fechas ---------- */
+function larga(y,m,d,wd){
+  if(m<1||m>12||d<1||d>31)return null;
+  let s=d+' de '+MESES[m-1]+' de '+y;
+  if(wd){const dt=new Date(y,m-1,d);if(dt.getMonth()===m-1)s=DIAS[dt.getDay()]+' '+s;}
+  return s;
+}
+function fmtFecha(s,wd){
+  s=clean(s);if(!s)return '';
+  let m;
+  if((m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/)))return larga(+m[1],+m[2],+m[3],wd)||s;
+  if((m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/)))return larga(+m[3],+m[2],+m[1],wd)||s;
+  if((m=s.match(/^(\d{4})-(\d{1,2})$/))&&+m[2]>=1&&+m[2]<=12)return MESES[+m[2]-1]+' de '+m[1];
+  return s;
+}
+function anioDe(s){const m=String(s||'').match(/\b(?:1[5-9]|20)\d{2}\b/g);return m?m[m.length-1]:'';}
+
+/* ---------- Autores (reglas de la pág. 53) ---------- */
+function nombreInv(a){const ap=clean(a.ap),nom=clean(a.nom);if(!ap)return nom;return nom?ap+', '+nom:ap;}
+function nombreDir(a){return clean(clean(a.nom)+' '+clean(a.ap));}
+function listaAutores(arr){
+  const L=(arr||[]).filter(a=>clean(a.ap)||clean(a.nom));
+  const n=L.length;
+  if(!n)return '';
+  if(n>=4)return esc(nombreInv(L[0]))+' <i>et al.</i>';
+  if(n===1)return esc(nombreInv(L[0]));
+  if(n===2)return esc(nombreInv(L[0]))+' y '+esc(nombreDir(L[1]));
+  return esc(nombreInv(L[0]))+'; '+esc(nombreInv(L[1]))+' y '+esc(nombreDir(L[2]));
+}
+function listaY(s){
+  const L=String(s||'').split(/[,;\n]+/).map(clean).filter(Boolean);
+  if(L.length<2)return esc(L[0]||'');
+  return esc(L.slice(0,-1).join(', '))+' y '+esc(L[L.length-1]);
+}
+
+/* ---------- Lugar, páginas, cierre ---------- */
+const CDMX_RE=/^(?:m[eé]xico(?:\s*,?\s*(?:d\.?\s?f\.?|cdmx|cd\.?\s?mx|ciudad de m[eé]xico|mexico city))?|ciudad de m[eé]xico|mexico city|cdmx|d\.?\s?f\.?|distrito federal)$/i;
+function lugarLibro(s){s=clean(s);return CDMX_RE.test(s)?'México':s;}
+function lugarHemero(s,fecha){
+  s=clean(s);if(!s)return '';
+  if(CDMX_RE.test(s)){const y=+anioDe(fecha);if(y)return y>=2016?'México, CDMX':'México, D.F.';}
+  return s;
+}
+function pags(s){
+  s=clean(s).replace(/[–—]/g,'-').replace(/^pp?\.?\s*/i,'');
+  if(!s)return '';
+  return s.includes('-')?'Pp. '+s.replace(/\s*-\s*/,'-'):'p. '+s;
+}
+function punto(h){
+  if(!h)return '';
+  const p=h.replace(/<[^>]+>/g,'').replace(/&[a-z#0-9]+;/gi,'x').trim();
+  return /[.!?…]$/.test(p)?h:h+'.';
+}
+function unePunto(titulo,resto,raw){ // si el título termina en punto no se agrega coma (ej. pág. 58)
+  if(!titulo)return resto;
+  if(!resto)return titulo;
+  return /\.$/.test(clean(raw))?titulo+' '+resto:titulo+', '+resto;
+}
+function cierra(core,d,o){
+  o=o||{};
+  const url=clean(d.url);
+  if((o.siempre||d.enlinea)&&url){
+    const u='&lt;'+esc(url)+'&gt;';
+    const c=clean(d.consulta)?' (Consultado el '+esc(fmtFecha(d.consulta))+').':'';
+    let head;
+    if(o.en===false)head=core?core+', '+u:u;
+    else head=core?core+(o.solo?' ':', ')+'en: '+u:'en: '+u;
+    return head+'.'+c;
+  }
+  return punto(core);
+}
+
+/* ---------- Registro de tipos de ficha ---------- */
+const HINT_AUT='Con 4 o más autores se cita solo el primero y “et al.”. Si el autor es una institución, escribe su nombre en «Apellido(s)» y deja «Nombre(s)» vacío.';
+const ONLINE=[
+  {id:'enlinea',kind:'toggle',label:'La consulté en internet (agrega enlace y fecha de consulta)'},
+  {id:'url',label:'Enlace (URL)',ph:'https://…',showIf:d=>d.enlinea},
+  {id:'consulta',kind:'consulta',label:'Fecha de consulta',half:true,showIf:d=>d.enlinea}
+];
+const URLF=[
+  {id:'url',label:'Enlace (URL)',ph:'https://…',req:true},
+  {id:'consulta',kind:'consulta',label:'Fecha de consulta',half:true}
+];
+const FECHA_PH='16 de junio de 2015 · 2015-06-16 · 16/06/2015';
+
+const TIPOS={
+  libro:{grupo:'Bibliográficas',nombre:'Libro completo',online:'opt',
+    ayuda:'Ficha bibliográfica general. Orden: autor, título, lugar, editorial, año y páginas totales.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es)',hint:HINT_AUT},
+      {id:'titulo',label:'Título y subtítulo',ph:'Una historia de la lectura',req:true},
+      {id:'edicion',label:'Edición (número)',type:'number',half:true,ph:'Solo se muestra desde la 2ª'},
+      {id:'lugar',label:'Lugar de impresión',half:true,ph:'México',req:true},
+      {id:'editorial',label:'Editorial',half:true,ph:'Norma',req:true},
+      {id:'coleccion',label:'Colección, serie o tomo',half:true,ph:'Colecc. Popular núm. 152'},
+      {id:'anio',label:'Año',half:true,ph:'1999',req:true},
+      {id:'paginas',label:'Páginas totales',half:true,ph:'477'}
+    ],
+    build(d){
+      const ed=(+d.edicion>=2)?(+d.edicion)+'ª ed':'';
+      const pp=clean(d.paginas)?T(String(d.paginas).replace(/\s*pp?\.?\s*$/i,''))+' pp.':'';
+      const edit=T(d.editorial)+(clean(d.coleccion)?' ('+T(d.coleccion)+')':'');
+      return cierra(J(listaAutores(d.autores),I(d.titulo),ed,T(lugarLibro(d.lugar)),edit,T(d.anio),pp),d);
+    }},
+  capitulo:{grupo:'Bibliográficas',nombre:'Capítulo o texto dentro de un libro',online:'opt',
+    ayuda:'Ficha bibliográfica específica: un cuento, artículo, ensayo o capítulo que está dentro de un libro.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es) del texto',hint:HINT_AUT},
+      {id:'titulo',label:'Título del texto (cuento, artículo, capítulo…)',ph:'Pasear al perro',req:true},
+      {id:'mismo',kind:'toggle',label:'El libro es del mismo autor que el texto'},
+      {id:'editores',kind:'authors',label:'Autor, compilador o coordinador del libro',showIf:d=>!d.mismo},
+      {id:'rol',kind:'select',label:'Función en el libro',half:true,showIf:d=>!d.mismo,
+        opts:[['','Ninguna'],['comp.','Compilador (comp.)'],['coord.','Coordinador (coord.)'],['ed.','Editor (ed.)'],['prol.','Prologuista (prol.)']]},
+      {id:'libro',label:'Título y subtítulo del libro',ph:'Relatos vertiginosos. Antología de cuentos mínimos',req:true},
+      {id:'lugar',label:'Lugar de impresión',half:true,ph:'México',req:true},
+      {id:'editorial',label:'Editorial',half:true,ph:'Alfaguara',req:true},
+      {id:'coleccion',label:'Colección, serie o tomo',half:true,ph:'Colecc.: Ave Fénix # 149'},
+      {id:'anio',label:'Año',half:true,ph:'2000',req:true},
+      {id:'paginas',label:'Páginas del texto',half:true,ph:'127-128  ·  o solo  166',req:true}
+    ],
+    build(d){
+      const rolTxt=(!d.mismo&&listaAutores(d.editores)&&d.rol)?' ('+esc(d.rol)+')':'';
+      const ed=d.mismo?'':listaAutores(d.editores)+rolTxt;
+      const edit=T(d.editorial)+(clean(d.coleccion)?' ('+T(d.coleccion)+')':'');
+      const head=J(listaAutores(d.autores),Q(d.titulo));
+      const resto=J(ed,I(d.libro),T(d.lugar),edit,T(d.anio),T(pags(d.paginas)));
+      const core=head?(resto?head+' en: '+resto:head):resto;
+      return cierra(core,d);
+    }},
+  revista:{grupo:'Hemerográficas',nombre:'Artículo de revista',online:'opt',
+    ayuda:'Ficha hemerográfica específica de una revista, impresa o consultada en línea (incluye artículos con DOI).',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es) del artículo',hint:HINT_AUT},
+      {id:'titulo',label:'Título y subtítulo del artículo',ph:'Lazos de Sol y Sombra',req:true},
+      {id:'revista',label:'Nombre de la revista (título y subtítulo)',ph:'Literatura Mexicana, Revista Semestral del Centro de Estudios Literarios',req:true},
+      {id:'institucion',label:'Institución que edita',ph:'unam, Instituto de Investigaciones Filológicas'},
+      {id:'volumen',label:'Volumen',half:true,ph:'XXV'},
+      {id:'numero',label:'Número',half:true,ph:'2'},
+      {id:'fecha',label:'Fecha o periodo',half:true,date:true,ph:'2014  ·  julio-septiembre 2010',req:true},
+      {id:'extra',label:'Sección o edición especial',half:true,ph:'edición coleccionable # 42'},
+      {id:'paginas',label:'Páginas',half:true,ph:'75-91  ·  o solo  28'},
+      {id:'lugar',label:'Lugar',half:true,ph:'México'}
+    ],
+    build(d){
+      const head=J(listaAutores(d.autores),Q(d.titulo));
+      const resto=J(I(d.revista),T(d.institucion),clean(d.volumen)?'vol. '+T(d.volumen):'',clean(d.numero)?'núm. '+T(d.numero):'',
+        T(fmtFecha(d.fecha)),T(d.extra),T(pags(d.paginas)),T(lugarHemero(d.lugar,d.fecha)));
+      const core=head?(resto?head+' en: '+resto:head):resto;
+      return cierra(core,d);
+    }},
+  periodico:{grupo:'Hemerográficas',nombre:'Nota o columna de periódico',online:'opt',
+    ayuda:'Ficha hemerográfica específica: columna, reportaje, artículo de opinión o noticia de un periódico.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es)'},
+      {id:'titulo',label:'Título y subtítulo del texto',ph:'Decepciones electorales',req:true},
+      {id:'periodico',label:'Nombre del periódico',ph:'Reforma',req:true},
+      {id:'institucion',label:'Institución que edita (si hay)',ph:''},
+      {id:'fecha',label:'Fecha completa',half:true,date:true,ph:FECHA_PH,req:true},
+      {id:'seccion',label:'Sección',half:true,ph:'Opinión'},
+      {id:'paginas',label:'Páginas',half:true,ph:'10'},
+      {id:'lugar',label:'Lugar (país y ciudad)',half:true,ph:'México'}
+    ],
+    build(d){
+      const head=J(listaAutores(d.autores),Q(d.titulo));
+      const resto=J(I(d.periodico),T(d.institucion),T(fmtFecha(d.fecha)),clean(d.seccion)?'secc: '+T(d.seccion):'',
+        T(pags(d.paginas)),T(lugarHemero(d.lugar,d.fecha)));
+      const core=head?(resto?head+' en: '+resto:head):resto;
+      return cierra(core,d);
+    }},
+  publicacion:{grupo:'Hemerográficas',nombre:'Revista o periódico completo',
+    ayuda:'Ficha hemerográfica general: la publicación completa, no un texto en particular.',
+    campos:[
+      {id:'titulo',label:'Título y subtítulo de la publicación',ph:'Proceso. Semanario de Información y Análisis',req:true},
+      {id:'director',label:'Director responsable (nombre y apellido)',ph:'Rafael Rodríguez Castañeda'},
+      {id:'puesto',label:'Puesto',half:true,ph:'director'},
+      {id:'tipo',label:'Tipo de publicación',half:true,ph:'revista semanal  ·  diario'},
+      {id:'numero',label:'Número',half:true,ph:'1988'},
+      {id:'lugar',label:'Lugar',half:true,ph:'México'},
+      {id:'fecha',label:'Fecha o periodo',date:true,ph:FECHA_PH}
+    ],
+    build(d){
+      return punto(J(I(d.titulo),T(d.director),T(d.puesto),T(d.tipo),clean(d.numero)?'núm. '+T(d.numero):'',
+        T(lugarHemero(d.lugar,d.fecha)),T(fmtFecha(d.fecha))));
+    }},
+  web:{grupo:'Mesográficas',nombre:'Página web o documento',online:'always',
+    ayuda:'Ficha mesográfica: textos y documentos consultados en internet. Sin autor, la ficha empieza con el título.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es)',hint:HINT_AUT},
+      {id:'tipo',kind:'select',label:'¿Qué estás citando?',def:'comillas',
+        opts:[['comillas','Un documento, artículo o capítulo (título entre comillas)'],['cursivas','Una obra completa o un concepto buscado (título en cursivas)']]},
+      {id:'titulo',label:'Título',ph:'Cervantes en las Américas',req:true},
+      {id:'datos',label:'Datos de la publicación (institución, centro, editorial, lugar…)',ph:'Centro Virtual Cervantes'},
+      {id:'fecha',label:'Fecha de publicación',date:true,ph:FECHA_PH}
+    ].concat(URLF),
+    build(d){
+      const tit=d.tipo==='cursivas'?I(d.titulo):Q(d.titulo);
+      const resto=J(T(d.datos),T(fmtFecha(d.fecha)));
+      const aut=listaAutores(d.autores);
+      return cierra(J(aut,tit,resto),d,{siempre:true,solo:!aut&&!resto&&d.tipo==='cursivas'});
+    }},
+  blog:{grupo:'Mesográficas',nombre:'Entrada de blog',online:'always',
+    ayuda:'Ficha mesográfica de un blog: autor, título de la entrada, título del blog, editor y fecha.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor(es) de la entrada'},
+      {id:'titulo',label:'Título de la entrada',ph:'Crean una memoria digital capaz de sobrevivir a la especie humana',req:true},
+      {id:'blog',label:'Título del blog',ph:'El Blog. Ciencia y Tecnología',req:true},
+      {id:'editor',label:'Editor',half:true,ph:''},
+      {id:'fecha',label:'Fecha de publicación',half:true,date:true,ph:FECHA_PH}
+    ].concat(URLF),
+    build(d){
+      const head=J(listaAutores(d.autores),Q(d.titulo));
+      const resto=J(I(d.blog),T(d.editor),T(fmtFecha(d.fecha)));
+      const core=head?(resto?head+' en: '+resto:head):resto;
+      return cierra(core,d,{siempre:true,en:false});
+    }},
+  video:{grupo:'Mesográficas',nombre:'Video o filme en línea',online:'always',
+    ayuda:'Ficha mesográfica de un video o filme bajado de internet.',
+    campos:[
+      {id:'titulo',label:'Título y subtítulo',ph:'El origen del teatro y la tragedia 1. Antes del teatro.',req:true},
+      {id:'tipo',label:'Tipo de video o filme',half:true,list:['cortometraje','largometraje','documental','cápsula animada','conferencia','entrevista','tutorial'],ph:'documental'},
+      {id:'productor',label:'Producido por (institución, empresa o persona)',half:true,ph:'ILCE Enciclomedia'},
+      {id:'director',label:'Dirección de',half:true,ph:'Roberto Jaimes Romo'},
+      {id:'fecha',label:'Fecha de producción o de carga',half:true,date:true,ph:FECHA_PH}
+    ].concat(URLF),
+    build(d){
+      const resto=J(T(d.tipo),clean(d.productor)?'Producido por: '+T(d.productor):'',clean(d.director)?'Dirección de: '+T(d.director):'',T(fmtFecha(d.fecha)));
+      return cierra(unePunto(I(d.titulo),resto,d.titulo),d,{siempre:true});
+    }},
+  facebook:{grupo:'Mesográficas',nombre:'Post de Facebook',online:'always',
+    ayuda:'Ficha mesográfica de un post de Facebook.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Usuario (apellido y nombre)'},
+      {id:'post',kind:'area',label:'Texto íntegro del post',ph:'Pega aquí el texto completo del post',req:true},
+      {id:'fecha',label:'Fecha del post',date:true,ph:FECHA_PH}
+    ].concat(URLF),
+    build(d){return cierra(J(listaAutores(d.autores),Q(d.post),'Facebook',T(fmtFecha(d.fecha))),d,{siempre:true});}},
+  tuit:{grupo:'Mesográficas',nombre:'Tuit',
+    ayuda:'Ficha de un tuit: autor, nombre de usuario entre paréntesis, tuit íntegro en cursivas, fecha, hora y la palabra «Tuit».',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor (apellido y nombre)'},
+      {id:'usuario',label:'Nombre de usuario',half:true,ph:'JohnDoeNombreEjemplo'},
+      {id:'hora',label:'Hora',half:true,ph:'12:00 pm'},
+      {id:'texto',kind:'area',label:'Tuit íntegro',ph:'Pega aquí el texto completo del tuit',req:true},
+      {id:'fecha',label:'Fecha',date:true,ph:FECHA_PH}
+    ],
+    build(d){
+      const quien=listaAutores(d.autores),usu=clean(d.usuario).replace(/^@/,'');
+      const a=quien?quien+(usu?' ('+esc(usu)+')':''):esc(usu);
+      const resto=J(T(fmtFecha(d.fecha)),T(d.hora),'Tuit');
+      return punto(unePunto(J(a,I(d.texto)),resto,d.texto));
+    }},
+  correo:{grupo:'Otras fuentes',nombre:'Correo electrónico',
+    ayuda:'Ficha de un correo electrónico: autor, título del mensaje, destinatario y fecha.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Autor del correo (apellido y nombre)'},
+      {id:'titulo',label:'Título o asunto del mensaje',ph:'Publicación de las ponencias…',req:true},
+      {id:'destinatario',label:'Mensaje para (nombre y apellido)',half:true,ph:'Josefina Félix Mercado'},
+      {id:'fecha',label:'Fecha del mensaje',half:true,date:true,ph:FECHA_PH}
+    ],
+    build(d){return punto(J(listaAutores(d.autores),Q(d.titulo),clean(d.destinatario)?'mensaje para '+T(d.destinatario):'',T(fmtFecha(d.fecha)),'correo electrónico'));}},
+  tv:{grupo:'Otras fuentes',nombre:'Programa de radio o televisión',
+    ayuda:'Ficha de un episodio o segmento de un programa de radio o televisión.',
+    campos:[
+      {id:'episodio',label:'Título del episodio o segmento',ph:'La polarización de la mesa',req:true},
+      {id:'programa',label:'Título del programa',ph:'The Big Bang Theory',req:true},
+      {id:'serie',label:'Título de la serie (si hay)',ph:''},
+      {id:'capitulo',label:'Núm. de episodio o capítulo',half:true,ph:'16'},
+      {id:'temporada',label:'Temporada',half:true,ph:'7'},
+      {id:'canal',label:'Red o canal',half:true,ph:'Canal de la Warner Brothers'},
+      {id:'ciudad',label:'Ciudad',half:true,ph:'México'},
+      {id:'fecha',label:'Fecha de transmisión',date:true,ph:FECHA_PH}
+    ],
+    build(d){return punto(J(Q(d.episodio),I(d.programa),T(d.serie),clean(d.capitulo)?'capítulo '+T(d.capitulo):'',clean(d.temporada)?'temporada '+T(d.temporada):'',T(d.canal),T(d.ciudad),T(fmtFecha(d.fecha))));}},
+  pelicula:{grupo:'Otras fuentes',nombre:'Película',
+    ayuda:'Ficha de una película o video: título, dirección, actores, país, productora, año y formato.',
+    campos:[
+      {id:'titulo',label:'Título de la película',ph:'Medianoche en París',req:true},
+      {id:'director',label:'Dirección (nombre y apellidos)',ph:'Woody Allen'},
+      {id:'actores',kind:'area',label:'Actores (los 3 a 5 más importantes, separados por comas)',ph:'Owen Wilson, Rachel McAdams, Marion Cotillard'},
+      {id:'pais',label:'País que produjo',half:true,ph:'EUA y España'},
+      {id:'productora',label:'Casa productora o estudio',half:true,ph:'Gravier Productions y Mediapro'},
+      {id:'anio',label:'Año de lanzamiento',half:true,ph:'2011'},
+      {id:'formato',label:'Formato',half:true,list:['filme','DVD','Blu-Ray'],ph:'filme'}
+    ],
+    build(d){return punto(J(I(d.titulo),clean(d.director)?'dir. '+T(d.director):'',listaY(d.actores)?'actores: '+listaY(d.actores):'',T(d.pais),T(d.productora),T(d.anio),T(d.formato)));}},
+  espectaculo:{grupo:'Otras fuentes',nombre:'Espectáculo',
+    ayuda:'Obra de teatro, ópera, ballet, concierto… Se registra la fecha de asistencia.',
+    campos:[
+      {id:'titulo',label:'Título de la obra',ph:'Noche de estreno',req:true},
+      {id:'autoria',label:'Dramaturgo (o compositor)',half:true,ph:'John Cassavetes'},
+      {id:'director',label:'Dirección escénica',half:true,ph:'Antonio Castro'},
+      {id:'actores',kind:'area',label:'Actores (los 3 a 5 más importantes, separados por comas)',ph:'Ariane Pellicer, Arturo Ríos, Martín Altomaro'},
+      {id:'lugar',label:'Lugar de la representación (teatro)',half:true,ph:'Teatro El Galeón'},
+      {id:'institucion',label:'Institución o empresa',half:true,ph:'Coordinación Nacional de Teatro-INBA'},
+      {id:'ciudad',label:'País y ciudad',half:true,ph:'CDMX'},
+      {id:'fecha',label:'Fecha de asistencia',half:true,date:true,weekday:true,ph:FECHA_PH}
+    ],
+    build(d){
+      const t=I(d.titulo)+(clean(d.autoria)?' de '+T(d.autoria):'');
+      return punto(J(t,clean(d.director)?'dir. '+T(d.director):'',listaY(d.actores)?'actores: '+listaY(d.actores):'',T(d.lugar),T(d.institucion),T(d.ciudad),T(fmtFecha(d.fecha,true))));
+    }},
+  entrevista:{grupo:'Otras fuentes',nombre:'Entrevista',online:'opt',
+    ayuda:'Ficha de una entrevista publicada: entrevistado, título, entrevistador y datos de la publicación.',
+    campos:[
+      {id:'autores',kind:'authors',label:'Persona entrevistada'},
+      {id:'titulo',label:'Título de la entrevista (si no tiene, déjalo vacío)',ph:'Jose es mi pastora. Entrevista con Josefina Félix'},
+      {id:'entrevistador',label:'Por: entrevistador (nombre y apellido)',ph:'Marina Hernández Koestinger'},
+      {id:'medio',label:'Publicación o medio (se pone en cursivas)',ph:'El Madrugador. Gaceta del Bachillerato del Colegio Madrid',req:true},
+      {id:'datos',label:'Datos de la publicación (fecha, núm., páginas, lugar)',ph:'marzo 2015, núm. 6, pp. 19-20, México, D.F.'}
+    ],
+    build(d){
+      const aut=listaAutores(d.autores);
+      const tit=clean(d.titulo)?Q(d.titulo):'Entrevista';
+      const head=(aut?aut+', ':'')+tit+(clean(d.entrevistador)?' por: '+T(d.entrevistador):'');
+      const resto=J(I(d.medio),T(d.datos));
+      return cierra(resto?head+' en: '+resto:head,d);
+    }}
+};
+
+function camposDe(tipo){const t=TIPOS[tipo];return t.campos.concat(t.online==='opt'?ONLINE:[]);}
+function vacio(tipo){
+  const o={};
+  for(const f of camposDe(tipo)){
+    o[f.id]=f.kind==='authors'?[{ap:'',nom:''}]:f.kind==='toggle'?false:f.kind==='consulta'?hoy():(f.def!==undefined?f.def:'');
+  }
+  return o;
+}
+function campoVacio(v){
+  if(Array.isArray(v))return !v.some(a=>clean(a.ap)||clean(a.nom));
+  return !clean(v);
+}
+function citaBreve(d){
+  const L=(d.autores||[]).filter(a=>clean(a.ap)||clean(a.nom));
+  const ap=a=>esc(clean(a.ap)||clean(a.nom));
+  const y=anioDe(d.anio)||anioDe(d.fecha)||'s.f.';
+  let quien='';
+  if(L.length)quien=L.length===1?ap(L[0]):L.length===2?ap(L[0])+' y '+ap(L[1]):ap(L[0])+' <i>et al.</i>';
+  else if(clean(d.usuario))quien=esc(clean(d.usuario).replace(/^@/,''));
+  else{
+    const t=clean(d.titulo||d.programa||d.episodio||d.blog||d.post||d.texto||d.libro||d.medio);
+    if(!t)return '';
+    quien='“'+esc(t.length>30?t.slice(0,30).trim()+'…':t)+'”';
+  }
+  return '('+quien+', '+y+')';
+}
+
+/* ---------- Limpieza de datos que llegan de internet ---------- */
+const PART=new Set(['de','del','la','las','los','y','e','van','von','der','den','da','das','do','dos','di','le','el','al','bin','ibn','san','santa']);
+function splitName(full){
+  full=clean(full);if(!full)return {ap:'',nom:''};
+  if(full.includes(',')){const i=full.indexOf(',');return {ap:clean(full.slice(0,i)),nom:clean(full.slice(i+1))};}
+  const w=full.split(' ');
+  if(w.length===1)return {ap:full,nom:''};
+  let i=w.length-(w.length>=3?2:1);
+  while(i>1&&PART.has(w[i-1].toLowerCase()))i--;
+  while(i<w.length-1&&/^[A-ZÁÉÍÓÚÑ]\.?$/.test(w[i]))i++;
+  return {ap:w.slice(i).join(' '),nom:w.slice(0,i).join(' ')};
+}
+function parseAutores(s){
+  s=clean(s);if(!s||/^https?:/i.test(s))return [];
+  let partes=s.includes(';')?s.split(';'):s.split(/\s+(?:y|and|&)\s+/i);
+  return partes.map(splitName).filter(a=>a.ap||a.nom).slice(0,6);
+}
+const CIUDADES={'mexico city':'México','mexico':'México','new york':'Nueva York','london':'Londres','paris':'París','rome':'Roma','lisbon':'Lisboa','vienna':'Viena','brussels':'Bruselas','geneva':'Ginebra','zurich':'Zúrich','moscow':'Moscú','prague':'Praga','warsaw':'Varsovia','cologne':'Colonia','venice':'Venecia','florence':'Florencia','milan':'Milán','turin':'Turín','naples':'Nápoles','bogota':'Bogotá','havana':'La Habana','buenos aires':'Buenos Aires','santiago':'Santiago'};
+function limpiaLugar(s){
+  s=clean(s);if(!s)return '';
+  s=s.replace(/\[.*?\]|\(.*?\)/g,'').split(/[,;:\/]/)[0].trim();
+  if(CDMX_RE.test(s))return 'México';
+  return CIUDADES[s.toLowerCase()]||s;
+}
+const limpiaEditorial=s=>clean(s).replace(/^(editorial|ed\.)\s+/i,'');
+function joinTitle(t,s){
+  t=clean(t);s=clean(s);
+  if(!s)return t;if(!t)return s;
+  return /[.?!:]$/.test(t)?t+' '+s:t+'. '+s;
+}
+function extractDoi(s){
+  const m=String(s).match(/\b(10\.\d{4,9}\/[^\s"<>]+)/i);
+  return m?m[1].replace(/[).,;:\]]+$/,''):null;
+}
+function extractIsbn(s){
+  const t=String(s).trim();if(/^https?:/i.test(t))return null;
+  const x=t.replace(/^isbn(?:-1[03])?[:\s]*/i,'').replace(/[\s-]/g,'');
+  return /^(\d{9}[\dXx]|97[89]\d{10})$/.test(x)?x.toUpperCase():null;
+}
+function isbnValido(x){
+  if(x.length===13){let s=0;for(let i=0;i<13;i++)s+=(+x[i])*(i%2?3:1);return s%10===0;}
+  if(x.length===10){let s=0;for(let i=0;i<10;i++){const c=x[i]==='X'?10:+x[i];s+=c*(10-i);}return s%11===0;}
+  return false;
+}
+function hostDe(u){try{return new URL(/^https?:/i.test(u)?u:'https://'+u).hostname.toLowerCase().replace(/^www\./,'');}catch(e){return '';}}
+function tipoPorUrl(u){
+  const h=hostDe(u);
+  if(/(^|\.)(youtube\.com|youtu\.be|vimeo\.com)$/.test(h))return 'video';
+  if(/(^|\.)(facebook\.com|fb\.watch)$/.test(h))return 'facebook';
+  if(/(^|\.)(twitter\.com|x\.com)$/.test(h))return 'tuit';
+  if(/blog/i.test(u)||/wordpress|blogspot/.test(h))return 'blog';
+  return 'web';
+}
+function sitioDeUrl(u){const h=hostDe(u).split('.')[0];return h?h.charAt(0).toUpperCase()+h.slice(1):'';}
+function tituloLimpio(t,pub){
+  t=clean(t);pub=clean(pub);
+  if(pub){const re=new RegExp('\\s*[|\\-–—·:]\\s*'+pub.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$','i');t=t.replace(re,'');}
+  return t;
+}
+function llenarDesdeMeta(tipo,m,url){
+  const titulo=tituloLimpio(m.titulo,m.sitio),aut=parseAutores(m.autor);
+  switch(tipo){
+    case 'video':return {titulo,productor:clean(m.autor)||clean(m.sitio),fecha:m.fecha,url};
+    case 'facebook':return {autores:aut.length?aut:(clean(m.sitio)?[{ap:clean(m.sitio),nom:''}]:[]),post:titulo,fecha:m.fecha,url};
+    case 'tuit':{const u=(function(){try{return new URL(/^https?:/i.test(url)?url:'https://'+url).pathname.split('/').filter(Boolean)[0]||'';}catch(e){return '';}})();
+      return {autores:aut,usuario:u,texto:titulo,fecha:m.fecha};}
+    case 'blog':return {autores:aut,titulo,blog:clean(m.sitio),fecha:m.fecha,url};
+    default:return {autores:aut,titulo,datos:clean(m.sitio),fecha:m.fecha,url};
+  }
+}
+
+/* ---------- Mapeo de respuestas de las APIs ---------- */
+function mapCrossref(m,doi){
+  const titulo=joinTitle(cleanApi((m.title||[])[0]),cleanApi((m.subtitle||[])[0]));
+  const aut=a=>({ap:cleanApi(a.family||a.name||''),nom:cleanApi(a.given||'')});
+  const autores=(m.author||[]).map(aut).filter(a=>a.ap||a.nom);
+  const editores=(m.editor||[]).map(aut).filter(a=>a.ap||a.nom);
+  const dp=(((m.issued||m['published-print']||m['published-online']||{})['date-parts'])||[[]])[0]||[];
+  const anio=dp[0]?String(dp[0]):'';
+  const cont=cleanApi((m['container-title']||[])[0]);
+  const editorial=limpiaEditorial(cleanApi(m.publisher));
+  const lugar=limpiaLugar(m['publisher-location']);
+  const url='https://doi.org/'+doi;
+  switch(m.type){
+    case 'journal-article':
+      return {tipo:'revista',data:{autores,titulo,revista:cont,institucion:editorial,volumen:cleanApi(m.volume),numero:cleanApi(m.issue),fecha:anio,paginas:cleanApi(m.page),lugar,enlinea:true,url}};
+    case 'book-chapter':case 'book-section':case 'book-part':case 'reference-entry':case 'proceedings-article':
+      return {tipo:'capitulo',data:{autores,titulo,mismo:false,editores,rol:editores.length?'ed.':'',libro:cont,lugar,editorial,anio,paginas:cleanApi(m.page),enlinea:true,url}};
+    case 'book':case 'monograph':case 'edited-book':case 'reference-book':case 'textbook':
+      return {tipo:'libro',data:{autores:autores.length?autores:editores,titulo,edicion:cleanApi(m['edition-number']),lugar,editorial,anio,enlinea:true,url}};
+    default:
+      return {tipo:'web',data:{autores,tipo:'comillas',titulo,datos:cont||editorial,fecha:anio,url}};
+  }
+}
+function mapIsbn(o,g){
+  o=o||{};g=g||{};
+  const aOL=(o.authors||[]).map(a=>splitName(a.name)).filter(a=>a.ap||a.nom);
+  const aGB=(g.authors||[]).map(splitName).filter(a=>a.ap||a.nom);
+  const usaO=!!o.title;
+  const titulo=joinTitle(cleanApi(usaO?o.title:g.title),cleanApi(usaO?o.subtitle:g.subtitle));
+  const pub=(o.publishers&&o.publishers[0]&&o.publishers[0].name)||g.publisher||'';
+  const lug=(o.publish_places&&o.publish_places[0]&&o.publish_places[0].name)||'';
+  return {
+    autores:aOL.length?aOL:aGB,
+    titulo,
+    editorial:limpiaEditorial(cleanApi(pub)),
+    lugar:limpiaLugar(lug),
+    anio:anioDe(o.publish_date)||anioDe(g.publishedDate),
+    paginas:String(o.number_of_pages||g.pageCount||'')
+  };
+}
+</script>
+
+<!-- ======================= APLICACIÓN (interfaz) ======================= -->
+<script id="app">
+(()=>{
+const $=(s,r=document)=>r.querySelector(s);
+const svg=p=>'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
+const IC={
+  copy:svg('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/>'),
+  save:svg('<path d="M6 4h12v17l-6-4-6 4z"/>'),
+  plus:svg('<path d="M12 5v14M5 12h14"/>'),
+  x:svg('<path d="M6 6l12 12M18 6L6 18"/>')
+};
+const GRUPOS=['Bibliográficas','Hemerográficas','Mesográficas','Otras fuentes'];
+let estado={tipo:'libro',datos:{},editando:null};
+let lista=[];try{lista=JSON.parse(localStorage.getItem('citador.lista')||'[]');}catch(e){}
+let az=true;try{az=localStorage.getItem('citador.az')!=='0';}catch(e){}
+const persiste=()=>{try{localStorage.setItem('citador.lista',JSON.stringify(lista));}catch(e){}};
+const D=()=>estado.datos[estado.tipo]||(estado.datos[estado.tipo]=vacio(estado.tipo));
+const nid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const clon=o=>JSON.parse(JSON.stringify(o));
+
+let tt;
+function aviso(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('on'),2300);}
+
+/* ---------- Pintar ---------- */
+function pintaChips(){
+  $('#chips').innerHTML=GRUPOS.map(g=>'<div><span class="grp-t">'+g+'</span><div class="chips">'+
+    Object.keys(TIPOS).filter(k=>TIPOS[k].grupo===g).map(k=>
+      '<button type="button" class="chip" data-tipo="'+k+'" aria-pressed="'+(k===estado.tipo)+'">'+TIPOS[k].nombre+'</button>').join('')+
+    '</div></div>').join('');
+}
+function campoHTML(f,d){
+  const id='f-'+f.id,req=f.req?'<span class="req" title="Dato importante">*</span>':'',half=f.half?' half':'';
+  if(f.kind==='authors'){
+    const L=d[f.id];
+    const rows=L.map((a,i)=>'<div class="arow"><span class="num">'+(i+1)+'</span>'+
+      '<input aria-label="Apellido(s) del autor '+(i+1)+'" placeholder="Apellido(s)" data-a="'+f.id+'" data-i="'+i+'" data-k="ap" value="'+esc(a.ap)+'">'+
+      '<input aria-label="Nombre(s) del autor '+(i+1)+'" placeholder="Nombre(s)" data-a="'+f.id+'" data-i="'+i+'" data-k="nom" value="'+esc(a.nom)+'">'+
+      '<button type="button" class="icon" data-act="rm" data-for="'+f.id+'" data-i="'+i+'" aria-label="Quitar autor '+(i+1)+'"'+(L.length<2?' disabled':'')+'>'+IC.x+'</button></div>').join('');
+    return '<div class="f"><label>'+f.label+req+'</label><div class="arows">'+rows+'</div>'+
+      '<div class="arow-foot"><button type="button" class="btn line sm" data-act="add" data-for="'+f.id+'">'+IC.plus+' Agregar</button></div>'+
+      (f.hint?'<small>'+f.hint+'</small>':'')+'</div>';
+  }
+  if(f.kind==='toggle')
+    return '<label class="switch f"><input type="checkbox" data-f="'+f.id+'"'+(d[f.id]?' checked':'')+'><span class="track"></span><span>'+f.label+'</span></label>';
+  if(f.kind==='select')
+    return '<div class="f'+half+'"><label for="'+id+'">'+f.label+req+'</label><select id="'+id+'" data-f="'+f.id+'">'+
+      f.opts.map(o=>'<option value="'+esc(o[0])+'"'+(d[f.id]===o[0]?' selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></div>';
+  if(f.kind==='area')
+    return '<div class="f'+half+'"><label for="'+id+'">'+f.label+req+'</label><textarea id="'+id+'" data-f="'+f.id+'" placeholder="'+esc(f.ph||'')+'">'+esc(d[f.id])+'</textarea></div>';
+  if(f.kind==='consulta')
+    return '<div class="f'+half+'"><label for="'+id+'">'+f.label+req+'</label><input id="'+id+'" type="date" data-f="'+f.id+'" value="'+esc(d[f.id])+'"></div>';
+  const lst=f.list?'<datalist id="dl-'+f.id+'">'+f.list.map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist>':'';
+  return '<div class="f'+half+'"><label for="'+id+'">'+f.label+req+'</label><input id="'+id+'" data-f="'+f.id+'" type="'+(f.type||'text')+'"'+
+    (f.type==='number'?' min="1" inputmode="numeric"':'')+(f.list?' list="dl-'+f.id+'"':'')+
+    ' placeholder="'+esc(f.ph||'')+'" value="'+esc(d[f.id])+'">'+lst+(f.date?'<small class="dp" data-dp="'+f.id+'"></small>':'')+'</div>';
+}
+function pintaForm(){
+  const t=TIPOS[estado.tipo],d=D();
+  $('#form-t').textContent=t.nombre;
+  $('#form-hint').textContent=t.ayuda;
+  $('#form').innerHTML=camposDe(estado.tipo).filter(f=>!f.showIf||f.showIf(d)).map(f=>campoHTML(f,d)).join('');
+  camposDe(estado.tipo).filter(f=>f.date).forEach(f=>previewFecha(f.id));
+}
+function previewFecha(id){
+  const el=$('[data-dp="'+id+'"]');if(!el)return;
+  const f=camposDe(estado.tipo).find(x=>x.id===id);
+  const raw=clean(D()[id]),out=fmtFecha(raw,f&&f.weekday);
+  el.textContent=raw&&out!==raw?'→ '+out:'';
+}
+function pintaResultado(){
+  const t=TIPOS[estado.tipo],d=D();
+  const ficha=t.build(d),esVacia=ficha===t.build(vacio(estado.tipo));
+  $('#ficha').innerHTML=esVacia?'<span class="ph">Aquí aparecerá tu ficha en cuanto llenes los datos…</span>':ficha;
+  const b=esVacia?'':citaBreve(d);
+  $('#breve').innerHTML=b||'<span class="ph">—</span>';
+  const falta=esVacia?[]:camposDe(estado.tipo).filter(f=>f.req&&(!f.showIf||f.showIf(d))&&campoVacio(d[f.id])).map(f=>f.label.replace(/\s*\(.*$/,''));
+  const w=$('#faltan');w.hidden=!falta.length;w.textContent=falta.length?'Faltan datos importantes: '+falta.join(', ')+'.':'';
+  const lbl=estado.editando&&lista.some(x=>x.id===estado.editando)?'Actualizar en mi lista':'Guardar en mi lista';
+  ['#btn-copiar','#dock-copiar'].forEach(s=>{const e=$(s);e.innerHTML=IC.copy+' Copiar ficha';e.disabled=esVacia;});
+  ['#btn-guardar','#dock-guardar'].forEach(s=>{const e=$(s);e.innerHTML=IC.save+' '+lbl;e.disabled=esVacia;});
+  $('#btn-breve').disabled=!b;
+}
+function pintaLista(){
+  const L=ordenada();
+  $('#lista-n').textContent=lista.length?'· '+lista.length+(lista.length===1?' ficha':' fichas'):'';
+  $('#vacia').hidden=!!lista.length;
+  $('#items').innerHTML=L.map(it=>'<li class="item" data-id="'+it.id+'"><div class="item-t">'+it.html+'</div><div class="item-a">'+
+    '<button type="button" class="btn line sm" data-ia="copy">'+IC.copy+' Copiar</button>'+
+    '<button type="button" class="btn line sm" data-ia="edit">Editar</button>'+
+    '<button type="button" class="btn ghost sm" data-ia="del">Quitar</button></div></li>').join('');
+  ['#btn-todo','#btn-word','#btn-vaciar'].forEach(s=>$(s).disabled=!lista.length);
+  $('#az').checked=az;
+}
+const clave=it=>plano(it.html).replace(/^[“"\s]+/,'');
+function ordenada(){
+  const a=lista.slice();
+  if(az)a.sort((x,y)=>clave(x).localeCompare(clave(y),'es',{sensitivity:'base',ignorePunctuation:true}));
+  return a;
+}
+function todo(){pintaChips();pintaForm();pintaResultado();pintaLista();}
+
+/* ---------- Acciones ---------- */
+function cambiaTipo(k){estado.tipo=k;estado.editando=null;pintaChips();pintaForm();pintaResultado();}
+function limpiar(){estado.datos[estado.tipo]=vacio(estado.tipo);estado.editando=null;pintaForm();pintaResultado();}
+async function copiar(html,msg){
+  const txt=plano(html.replace(/<\/p>/g,'\n\n')).trim();
+  let ok=false;
+  try{
+    if(window.ClipboardItem&&navigator.clipboard&&navigator.clipboard.write){
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html':new Blob(['<meta charset="utf-8">'+html],{type:'text/html'}),
+        'text/plain':new Blob([txt],{type:'text/plain'})})]);
+      ok=true;
+    }
+  }catch(e){}
+  if(!ok){
+    const el=document.createElement('div');el.contentEditable='true';
+    el.style.cssText='position:fixed;left:-9999px;top:0;white-space:pre-wrap';el.innerHTML=html;document.body.appendChild(el);
+    const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r);
+    try{ok=document.execCommand('copy');}catch(e){}
+    s.removeAllRanges();el.remove();
+  }
+  aviso(ok?(msg||'Copiada con cursivas'):'No pude copiar. Selecciona el texto y cópialo a mano.');
+}
+function guardar(){
+  const t=TIPOS[estado.tipo],d=D(),html=t.build(d);
+  if(html===t.build(vacio(estado.tipo))){aviso('Llena algunos datos primero');return;}
+  const it={id:estado.editando||nid(),tipo:estado.tipo,datos:clon(d),html};
+  const i=lista.findIndex(x=>x.id===it.id);
+  if(i>=0){lista[i]=it;aviso('Ficha actualizada');}else{lista.push(it);aviso('Guardada en tu lista');}
+  estado.editando=it.id;persiste();pintaLista();pintaResultado();
+}
+function editar(id){
+  const it=lista.find(x=>x.id===id);if(!it)return;
+  estado.tipo=it.tipo;estado.datos[it.tipo]=Object.assign(vacio(it.tipo),clon(it.datos));estado.editando=id;
+  todo();window.scrollTo({top:0,behavior:'smooth'});aviso('Editando: al terminar pulsa «Actualizar»');
+}
+function descargarWord(){
+  if(!lista.length)return;
+  const cuerpo=ordenada().map(i=>'<p style="margin:0 0 10pt 0">'+i.html+'</p>').join('\n');
+  const doc='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Fichas</title>'+
+    '<style>body{font-family:"Times New Roman",serif;font-size:12pt;line-height:1.5}</style></head><body>'+cuerpo+'</body></html>';
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\ufeff',doc],{type:'application/msword'}));
+  a.download='fichas.doc';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+}
+
+/* ---------- Autocompletar ---------- */
+function est(s,m){const e=$('#smart-status');e.dataset.s=s;e.textContent=m;}
+async function fj(url,ms){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||12000);
+  try{const r=await fetch(url,{signal:c.signal});if(!r.ok){const e=new Error('HTTP '+r.status);e.status=r.status;throw e;}return await r.json();}
+  finally{clearTimeout(t);}
+}
+async function ft(url,ms){
+  const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||12000);
+  try{const r=await fetch(url,{signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.text();}
+  finally{clearTimeout(t);}
+}
+async function porDOI(doi){
+  let r;
+  try{r=await fj('https://api.crossref.org/works/'+doi.split('/').map(encodeURIComponent).join('/'));}
+  catch(e){throw new Error(e.status===404?'No encontré ese DOI en Crossref. Revisa que esté completo o llena los datos a mano.':'No pude conectarme a Crossref. Revisa tu conexión e inténtalo de nuevo.');}
+  const res=mapCrossref(r.message,doi);
+  res.msg='Datos tomados de Crossref ('+TIPOS[res.tipo].nombre.toLowerCase()+'). Revisa el orden de nombres y apellidos y completa el lugar si falta.';
+  return res;
+}
+async function porISBN(isbn){
+  const [ol,gb]=await Promise.allSettled([
+    fj('https://openlibrary.org/api/books?bibkeys=ISBN:'+isbn+'&format=json&jscmd=data'),
+    fj('https://www.googleapis.com/books/v1/volumes?q=isbn:'+isbn+'&maxResults=1')]);
+  const o=ol.status==='fulfilled'?ol.value['ISBN:'+isbn]:null;
+  const g=gb.status==='fulfilled'?((gb.value.items||[])[0]||{}).volumeInfo:null;
+  if(!o&&!g){
+    if(ol.status==='rejected'&&gb.status==='rejected')throw new Error('No pude conectarme a Open Library ni a Google Books. Revisa tu conexión.');
+    throw new Error('No encontré ese ISBN. Llena los datos a mano.');
+  }
+  const fuentes=[o&&'Open Library',g&&'Google Books'].filter(Boolean).join(' y ');
+  return {tipo:'libro',data:mapIsbn(o,g),
+    msg:'Datos tomados de '+fuentes+'. Revisa autores, lugar, editorial y páginas.'+(isbnValido(isbn)?'':' Ojo: ese ISBN no pasa la validación; verifica que esté bien escrito.')};
+}
+async function metaMicrolink(url){
+  const j=await fj('https://api.microlink.io/?url='+encodeURIComponent(url),14000);
+  if(j.status!=='success')throw new Error('microlink');
+  const d=j.data||{};
+  return {titulo:d.title||'',autor:d.author||'',sitio:d.publisher||'',fecha:d.date||''};
+}
+async function metaProxy(url){
+  const html=await ft('https://api.allorigins.win/raw?url='+encodeURIComponent(url),14000);
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const m=s=>{const e=doc.querySelector(s);return e?(e.getAttribute('content')||''):'';};
+  return {titulo:m('meta[property="og:title"]')||doc.title||'',sitio:m('meta[property="og:site_name"]'),autor:m('meta[name="author"]'),
+    fecha:m('meta[property="article:published_time"]')||m('meta[name="date"]')};
+}
+async function porURL(raw){
+  const url=/^https?:\/\//i.test(raw)?raw:'https://'+raw;
+  const tipo=tipoPorUrl(url);
+  let meta=null;
+  try{meta=await metaMicrolink(url);}catch(e){}
+  if(!meta||!meta.titulo){try{meta=await metaProxy(url);}catch(e){}}
+  const ok=!!(meta&&meta.titulo);
+  const base=Object.assign({titulo:'',autor:'',sitio:'',fecha:''},meta||{});
+  if(!clean(base.sitio))base.sitio=sitioDeUrl(url);
+  return {tipo,data:llenarDesdeMeta(tipo,base,url),
+    msg:ok?'Datos leídos de la página ('+TIPOS[tipo].nombre.toLowerCase()+'). Revisa autor, título y fecha.'
+          :'No pude leer los datos de esa página (algunos sitios lo bloquean). Dejé el enlace; llena el resto a mano.',ok};
+}
+async function resolver(v){
+  const doi=extractDoi(v);if(doi)return porDOI(doi);
+  const isbn=extractIsbn(v);if(isbn)return porISBN(isbn);
+  if(/^(https?:\/\/|www\.)/i.test(v)||/^[\w-]+(\.[\w-]+)+\/\S*/.test(v))return porURL(v);
+  throw new Error('No reconozco eso como enlace, DOI o ISBN. Ejemplos: https://… · 10.1000/xyz123 · 978-607-16-0000-0');
+}
+function aplica(r){
+  const crudo=r.data||{},limpio={};
+  Object.keys(crudo).forEach(k=>{const v=crudo[k];if(v===undefined||v===null||(typeof v==='string'&&!v.trim()))return;limpio[k]=v;});
+  const d=Object.assign(vacio(r.tipo),limpio);
+  camposDe(r.tipo).forEach(f=>{if(f.kind==='authors'&&!(d[f.id]&&d[f.id].length))d[f.id]=[{ap:'',nom:''}];});
+  d.consulta=hoy();
+  estado.tipo=r.tipo;estado.datos[r.tipo]=d;estado.editando=null;
+  pintaChips();pintaForm();pintaResultado();
+}
+async function autocompletar(){
+  const v=$('#smart').value.trim();if(!v)return;
+  const b=$('#btn-auto');b.disabled=true;est('load','Buscando…');
+  try{
+    const r=await resolver(v);
+    aplica(r);
+    est(r.ok===false?'err':'ok',(r.ok===false?'':'✓ ')+r.msg);
+    if(matchMedia('(max-width:900px)').matches)$('#form-t').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(e){est('err',e.message||'No se pudo autocompletar.');}
+  finally{b.disabled=false;}
+}
+
+/* ---------- Eventos ---------- */
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('[data-tipo]');if(b)cambiaTipo(b.dataset.tipo);});
+$('#form').addEventListener('submit',e=>e.preventDefault());
+$('#form').addEventListener('input',e=>{
+  const el=e.target,d=D();
+  if(el.dataset.a)d[el.dataset.a][+el.dataset.i][el.dataset.k]=el.value;
+  else if(el.dataset.f&&el.type!=='checkbox'){
+    d[el.dataset.f]=el.value;
+    if($('[data-dp="'+el.dataset.f+'"]'))previewFecha(el.dataset.f);
+  }
+  pintaResultado();
+});
+$('#form').addEventListener('change',e=>{
+  const el=e.target;
+  if(el.type==='checkbox'&&el.dataset.f){D()[el.dataset.f]=el.checked;pintaForm();pintaResultado();}
+  else if(el.tagName==='SELECT'&&el.dataset.f&&TIPOS[estado.tipo].campos.some(f=>f.id===el.dataset.f&&f.kind==='select')){pintaResultado();}
+});
+$('#form').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const d=D(),k=b.dataset.for;
+  if(b.dataset.act==='add'){d[k].push({ap:'',nom:''});pintaForm();pintaResultado();const n=d[k].length-1;const el=$('[data-a="'+k+'"][data-i="'+n+'"][data-k="ap"]');if(el)el.focus();}
+  else if(b.dataset.act==='rm'&&d[k].length>1){d[k].splice(+b.dataset.i,1);pintaForm();pintaResultado();}
+});
+$('#btn-limpiar').addEventListener('click',limpiar);
+$('#btn-auto').addEventListener('click',autocompletar);
+$('#smart').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();autocompletar();}});
+$('#smart').addEventListener('paste',()=>setTimeout(autocompletar,60));
+const fichaActual=()=>TIPOS[estado.tipo].build(D());
+['#btn-copiar','#dock-copiar'].forEach(s=>$(s).addEventListener('click',()=>copiar(fichaActual(),'Ficha copiada con cursivas')));
+['#btn-guardar','#dock-guardar'].forEach(s=>$(s).addEventListener('click',guardar));
+$('#btn-breve').addEventListener('click',()=>copiar(citaBreve(D()),'Cita copiada'));
+$('#items').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ia]');if(!b)return;
+  const id=b.closest('.item').dataset.id,it=lista.find(x=>x.id===id);if(!it)return;
+  if(b.dataset.ia==='copy')copiar(it.html,'Ficha copiada con cursivas');
+  else if(b.dataset.ia==='edit')editar(id);
+  else{lista=lista.filter(x=>x.id!==id);if(estado.editando===id)estado.editando=null;persiste();pintaLista();pintaResultado();aviso('Ficha quitada');}
+});
+$('#btn-todo').addEventListener('click',()=>copiar(ordenada().map(i=>'<p>'+i.html+'</p>').join(''),'Lista copiada ('+lista.length+')'));
+$('#btn-word').addEventListener('click',descargarWord);
+$('#btn-vaciar').addEventListener('click',()=>{if(lista.length&&confirm('¿Borrar las '+lista.length+' fichas de tu lista?')){lista=[];estado.editando=null;persiste();pintaLista();pintaResultado();}});
+$('#az').addEventListener('change',e=>{az=e.target.checked;try{localStorage.setItem('citador.az',az?'1':'0');}catch(_){}pintaLista();});
+
+todo();
+})();
+</script>
+</body>
+</html>
